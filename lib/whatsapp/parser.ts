@@ -1,27 +1,29 @@
 import axios from 'axios';
 
 /**
- * Parses 11za webhook payload to extract media content
+ * Parses 11za (v2) webhook payload to extract media content
  * @param payload The incoming webhook JSON body from 11za
  * @returns Object including sender, text, and base64 encoded image
  */
 export async function parseWebhookPayload(payload: any) {
-  const { sender, type, mediaUrl, text } = payload;
-
-  if (type !== 'image') {
-    return { sender, isImage: false, text };
+  // Check if payload has the expected 11za structure
+  if (payload?.event !== 'message' || !payload?.data) {
+    return { sender: null, isImage: false, text: '' };
   }
 
-  if (!mediaUrl) {
-    throw new Error("Image message received but mediaUrl is missing");
+  const { from, type, image, text } = payload.data;
+  const messageText = text?.body || '';
+
+  if (type !== 'image' || !image?.url) {
+    return { sender: from, isImage: false, text: messageText };
   }
 
-  // 11za media URL usually requires the same api-key for access
-  const API_KEY = process.env.ELEVENZA_API_KEY;
+  const mediaUrl = image.url;
 
   try {
+    // Usually these CDNs don't need auth headers to download if the URL is signed,
+    // but we can add authorization if required by 11za
     const response = await axios.get(mediaUrl, {
-      headers: { 'api-key': API_KEY || "" },
       responseType: 'arraybuffer',
     });
 
@@ -29,13 +31,13 @@ export async function parseWebhookPayload(payload: any) {
     const base64 = buffer.toString('base64');
 
     return {
-      sender,
+      sender: from,
       isImage: true,
-      text,
+      text: messageText,
       base64Image: base64,
     };
   } catch (error: any) {
-    console.error("Error downloading image from 11za:", error.message);
+    console.error("Error downloading image from 11za URL:", error.message);
     throw new Error("Failed to download image from 11za");
   }
 }
