@@ -16,8 +16,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing contactId or syncType' }, { status: 400 });
     }
 
-    if (syncType === 'sync_skip') {
-      return NextResponse.json({ status: 'success', syncedTo: 'skipped' });
+    // Normalize syncType: accept both hyphens (from 11za bot JSON) and underscores
+    // JSON bot payloads: sync-all, sync-sheets, sync-calendar, sync-skip
+    const normalizedSyncType = syncType.replace(/-/g, '_');
+
+    if (normalizedSyncType === 'sync_skip') {
+      return NextResponse.json({ status: 'success', syncedTo: 'Skipped — saved locally' });
     }
 
     await dbConnect();
@@ -28,10 +32,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
     }
 
-    // 2. Identify user by phone
-    const cleanPhone = (phone || '').replace(/\+/g, '').trim(); 
+    // 2. Identify user from contact's userId
     const user = await User.findById(contact.userId);
-
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
@@ -40,28 +42,30 @@ export async function POST(req: NextRequest) {
     const integration = await Integration.findOne({ userId, provider: 'google' });
 
     if (!integration) {
-      return NextResponse.json({ error: 'Google integration not found' }, { status: 400 });
+      return NextResponse.json({ error: 'Google not connected. Visit: card-scan-lead.vercel.app/dashboard/integrations' }, { status: 400 });
     }
 
     const scope = integration.scope || '';
     const results: string[] = [];
 
-    // 3. Execution based on syncType
-    if (syncType === 'sync_all' || syncType === 'sync_sheets' || syncType === 'sync_calendar') {
+    // 3. Sheets: run for sync_all, sync_sheets, sync_calendar
+    if (['sync_all', 'sync_sheets', 'sync_calendar'].includes(normalizedSyncType)) {
       if (scope.includes('spreadsheets')) {
         await appendContactToSheet(userId, contact);
         results.push('Google Sheets');
       }
     }
 
-    if (syncType === 'sync_all' || syncType === 'sync_calendar') {
+    // 4. Calendar: run for sync_all, sync_calendar
+    if (['sync_all', 'sync_calendar'].includes(normalizedSyncType)) {
       if (scope.includes('calendar')) {
         await createFollowUpEvent(userId, contact);
         results.push('Google Calendar');
       }
     }
 
-    if (syncType === 'sync_all') {
+    // 5. Gmail + Contacts: only for sync_all
+    if (normalizedSyncType === 'sync_all') {
       if (scope.includes('gmail')) {
         await sendFollowUpEmail(userId, contact);
         results.push('Gmail');

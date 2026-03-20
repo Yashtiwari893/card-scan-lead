@@ -1,0 +1,537 @@
+{
+  "_id": "gridai_scanner_bot_v2",
+  "name": "GridAI Business Card Scanner Bot",
+  "export": true,
+  "exportTime": 1774031000000,
+  "exportedBy": {
+    "_id": "gridai_user_001",
+    "name": "GridAI Bot"
+  },
+  "createdAt": "2026-03-20T00:00:00.000Z",
+  "updatedAt": "2026-03-20T00:00:00.000Z",
+  "__v": 0,
+  "nodes": [
+    {
+      "id": "1",
+      "type": "html-template",
+      "icon": "/images/logo_only.png",
+      "position": { "x": -3000, "y": 0 },
+      "data": {
+        "selectEvent": "inbound_message",
+        "selectedPriority": "1",
+        "rulename": "GridAI Card Scanner Bot",
+        "expiryType": true,
+        "expiryDate": "",
+        "closeType": "minutes",
+        "closeValue": 30,
+        "expiryMessage": "Session expired. Send *hi* to restart.",
+        "expMsgType": "text",
+        "expiryInteractive": null,
+        "sessionExpMsg": "",
+        "sheet": false,
+        "googleSheetId": "",
+        "googleSheetName": "",
+        "status": true,
+        "botread": true,
+        "isCaseInsensitive": true,
+        "conditions": [
+          {
+            "operator": null,
+            "conditions": [
+              { "msgType": "message_text", "condition_type": "equals", "value": "hi" },
+              { "msgType": "message_text", "condition_type": "equals", "value": "Hi" },
+              { "msgType": "message_text", "condition_type": "equals", "value": "hello" },
+              { "msgType": "message_text", "condition_type": "equals", "value": "Hello" },
+              { "msgType": "message_text", "condition_type": "equals", "value": "start" },
+              { "msgType": "message_text", "condition_type": "equals", "value": "menu" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "NODE_WELCOME_MSG",
+      "type": "html-template",
+      "text": "Node NODE_WELCOME_MSG",
+      "position": { "x": -2400, "y": 0 },
+      "data": {
+        "tag": "SendText",
+        "textTagObj": {
+          "headercontent": "",
+          "textContent": "👋 Welcome to *GridAI* — Smart Business Card Scanner!\n\n🤖 Powered by Groq + Mistral + Gemini AI\n\nI can scan any business card and automatically save contacts to:\n📊 Google Sheets\n📅 Google Calendar\n📧 Gmail\n👤 Google Contacts\n\nSend me a photo of any business card to get started! 📸"
+        }
+      }
+    },
+    {
+      "id": "NODE_MAIN_MENU",
+      "type": "html-template",
+      "text": "Node NODE_MAIN_MENU",
+      "position": { "x": -1800, "y": 0 },
+      "data": {
+        "selectInteractive": {
+          "channel": "whatsapp",
+          "content": {
+            "contentType": "interactive",
+            "interactive": {
+              "subType": "list",
+              "components": {
+                "header": { "type": "text", "text": "GridAI Scanner" },
+                "body": { "type": "text", "text": "What would you like to do?" },
+                "footer": { "type": "text", "text": "Powered by GridAI" },
+                "list": {
+                  "title": "Choose Option",
+                  "sections": [
+                    {
+                      "title": "Actions",
+                      "rows": [
+                        { "payload": "menu-scan-card",    "title": "Scan Business Card",  "description": "Send a card photo to scan"      },
+                        { "payload": "menu-my-contacts",  "title": "My Contacts",          "description": "View all scanned contacts"      },
+                        { "payload": "menu-integrations", "title": "My Integrations",      "description": "Sheets, Calendar, Gmail status" },
+                        { "payload": "menu-help",         "title": "Help",                 "description": "How to use GridAI"              }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "subType": "list"
+        },
+        "tag": "AskList",
+        "storeVariable": "menu_choice",
+        "storeId": "",
+        "interactiveType": "static",
+        "attempt": 1,
+        "validationerrorMsg": ""
+      }
+    },
+    {
+      "id": "NODE_SCAN_INSTRUCTIONS",
+      "type": "html-template",
+      "text": "Node NODE_SCAN_INSTRUCTIONS",
+      "position": { "x": -1200, "y": -600 },
+      "data": {
+        "tag": "SendText",
+        "textTagObj": {
+          "headercontent": "",
+          "textContent": "📷 *Ready to Scan!*\n\nPlease send a clear photo of the business card now.\n\n✅ Tips for best results:\n• Text clearly visible\n• Good lighting\n• Full card in frame\n\n📸 Send the image now 👇"
+        }
+      }
+    },
+    {
+      "id": "NODE_SCANNING_MSG",
+      "type": "html-template",
+      "text": "Node NODE_SCANNING_MSG",
+      "position": { "x": -600, "y": -800 },
+      "data": {
+        "tag": "SendText",
+        "textTagObj": {
+          "headercontent": "",
+          "textContent": "⏳ *Scanning your card...*\n\n🤖 AI is reading the card details.\nThis takes 3-5 seconds. Please wait..."
+        }
+      }
+    },
+    {
+      "id": "NODE_SCAN_API",
+      "type": "html-template",
+      "text": "Node NODE_SCAN_API",
+      "position": { "x": 0, "y": -800 },
+      "data": {
+        "tag": "ApiRequest",
+        "apiData": {
+          "method": "POST",
+          "url": "https://card-scan-lead.vercel.app/api/bot/scan-card",
+          "params": [],
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "urlEncoded": [],
+          "bodyType": "json",
+          "bodyJson": "{\n  \"phone\": \"{{recipient.mobileNo}}\",\n  \"imageUrl\": \"{{content.media.url}}\"\n}",
+          "bodyRaw": "",
+          "formData": [],
+          "authType": "none",
+          "bearerToken": "",
+          "basicUsername": "",
+          "basicPassword": "",
+          "apiKey": ""
+        },
+        "storeResponseVariable": [
+          { "variable": "card_name",    "variableValue": "response.name"       },
+          { "variable": "card_email",   "variableValue": "response.email"      },
+          { "variable": "card_phone",   "variableValue": "response.phone"      },
+          { "variable": "card_company", "variableValue": "response.company"    },
+          { "variable": "card_role",    "variableValue": "response.jobTitle"   },
+          { "variable": "card_website", "variableValue": "response.website"    },
+          { "variable": "contact_id",   "variableValue": "response.contactId"  },
+          { "variable": "ai_provider",  "variableValue": "response.aiProvider" }
+        ]
+      }
+    },
+    {
+      "id": "NODE_SCAN_SUCCESS_MSG",
+      "type": "html-template",
+      "text": "Node NODE_SCAN_SUCCESS_MSG",
+      "position": { "x": 600, "y": -1000 },
+      "data": {
+        "tag": "SendText",
+        "textTagObj": {
+          "headercontent": "",
+          "textContent": "✅ *Card Scanned Successfully!*\n\n👤 *Name:* {{custom.card_name}}\n🏢 *Company:* {{custom.card_company}}\n💼 *Role:* {{custom.card_role}}\n📧 *Email:* {{custom.card_email}}\n📞 *Phone:* {{custom.card_phone}}\n🌐 *Website:* {{custom.card_website}}\n\n🤖 _Scanned by {{custom.ai_provider}}_"
+        }
+      }
+    },
+    {
+      "id": "NODE_SCAN_ERROR",
+      "type": "html-template",
+      "text": "Node NODE_SCAN_ERROR",
+      "position": { "x": 600, "y": -400 },
+      "data": {
+        "tag": "SendText",
+        "textTagObj": {
+          "headercontent": "",
+          "textContent": "❌ *Could not scan this card.*\n\nPossible reasons:\n• Image is blurry or too dark\n• Card text not clearly visible\n\nPlease try again with a clearer image.\nSend *hi* to go back to menu."
+        }
+      }
+    },
+    {
+      "id": "NODE_SYNC_MENU",
+      "type": "html-template",
+      "text": "Node NODE_SYNC_MENU",
+      "position": { "x": 1200, "y": -1000 },
+      "data": {
+        "selectInteractive": {
+          "channel": "whatsapp",
+          "content": {
+            "contentType": "interactive",
+            "interactive": {
+              "subType": "list",
+              "components": {
+                "header": { "type": "text", "text": "Sync Contact" },
+                "body": { "type": "text", "text": "📤 *Where to sync this contact?*\n\n👤 _{{custom.card_name}} — {{custom.card_company}}_" },
+                "footer": { "type": "text", "text": "Choose sync option" },
+                "list": {
+                  "title": "Sync Options",
+                  "sections": [
+                    {
+                      "title": "Google Integrations",
+                      "rows": [
+                        { "payload": "sync-all",      "title": "Sync All",           "description": "Sheets + Calendar + Gmail + Contacts" },
+                        { "payload": "sync-sheets",   "title": "Google Sheets Only", "description": "Add row to your sheet"               },
+                        { "payload": "sync-calendar", "title": "Calendar + Sheets",  "description": "Sheet row + follow-up event"          },
+                        { "payload": "sync-skip",     "title": "Skip — Save Only",   "description": "Save locally, sync later"             }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "subType": "list"
+        },
+        "tag": "AskList",
+        "storeVariable": "sync_choice",
+        "storeId": "",
+        "interactiveType": "static",
+        "attempt": 1,
+        "validationerrorMsg": ""
+      }
+    },
+    {
+      "id": "NODE_SYNC_API",
+      "type": "html-template",
+      "text": "Node NODE_SYNC_API",
+      "position": { "x": 1800, "y": -1200 },
+      "data": {
+        "tag": "ApiRequest",
+        "apiData": {
+          "method": "POST",
+          "url": "https://card-scan-lead.vercel.app/api/bot/sync-contact",
+          "params": [],
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "urlEncoded": [],
+          "bodyType": "json",
+          "bodyJson": "{\n  \"phone\": \"{{recipient.mobileNo}}\",\n  \"contactId\": \"{{custom.contact_id}}\",\n  \"syncType\": \"{{custom.sync_choice}}\"\n}",
+          "bodyRaw": "",
+          "formData": [],
+          "authType": "none",
+          "bearerToken": "",
+          "basicUsername": "",
+          "basicPassword": "",
+          "apiKey": ""
+        },
+        "storeResponseVariable": [
+          { "variable": "sync_status", "variableValue": "response.status"   },
+          { "variable": "synced_to",   "variableValue": "response.syncedTo" }
+        ]
+      }
+    },
+    {
+      "id": "NODE_SYNC_SUCCESS",
+      "type": "html-template",
+      "text": "Node NODE_SYNC_SUCCESS",
+      "position": { "x": 2400, "y": -1200 },
+      "data": {
+        "tag": "SendText",
+        "textTagObj": {
+          "headercontent": "",
+          "textContent": "🎉 *Contact Synced Successfully!*\n\n✅ Synced to: *{{custom.synced_to}}*\n\nSend *hi* to scan another card."
+        }
+      }
+    },
+    {
+      "id": "NODE_SYNC_ERROR",
+      "type": "html-template",
+      "text": "Node NODE_SYNC_ERROR",
+      "position": { "x": 2400, "y": -800 },
+      "data": {
+        "tag": "SendText",
+        "textTagObj": {
+          "headercontent": "",
+          "textContent": "⚠️ *Sync failed.*\n\nContact saved locally.\n\nConnect your Google account at:\nhttps://card-scan-lead.vercel.app/dashboard/integrations\n\nSend *hi* to continue."
+        }
+      }
+    },
+    {
+      "id": "NODE_SKIP_SYNC",
+      "type": "html-template",
+      "text": "Node NODE_SKIP_SYNC",
+      "position": { "x": 1800, "y": -600 },
+      "data": {
+        "tag": "SendText",
+        "textTagObj": {
+          "headercontent": "",
+          "textContent": "💾 *Contact Saved Locally!*\n\n_{{custom.card_name}}_ from _{{custom.card_company}}_ saved.\n\n🔗 View contacts:\nhttps://card-scan-lead.vercel.app/dashboard\n\nSend *hi* to scan another card."
+        }
+      }
+    },
+    {
+      "id": "NODE_SCAN_ANOTHER",
+      "type": "html-template",
+      "text": "Node NODE_SCAN_ANOTHER",
+      "position": { "x": 3000, "y": -1200 },
+      "data": {
+        "selectInteractive": {
+          "channel": "whatsapp",
+          "content": {
+            "contentType": "interactive",
+            "interactive": {
+              "subType": "buttons",
+              "components": {
+                "header": { "type": "text", "text": "What next?" },
+                "body": { "type": "text", "text": "Would you like to scan another card or go back to main menu?" },
+                "footer": { "type": "text", "text": "" },
+                "buttons": [
+                  { "type": "reply", "reply": { "payload": "btn-scan-another", "title": "Scan Another" } },
+                  { "type": "reply", "reply": { "payload": "btn-main-menu",    "title": "Main Menu"    } }
+                ]
+              }
+            }
+          },
+          "documentName": "",
+          "subType": "buttons"
+        },
+        "tag": "AskButton",
+        "storeVariable": "next_action",
+        "storeId": "",
+        "attempt": 1,
+        "interactiveType": "static",
+        "validationerrorMsg": ""
+      }
+    },
+    {
+      "id": "NODE_MY_CONTACTS_API",
+      "type": "html-template",
+      "text": "Node NODE_MY_CONTACTS_API",
+      "position": { "x": -1200, "y": 600 },
+      "data": {
+        "tag": "ApiRequest",
+        "apiData": {
+          "method": "GET",
+          "url": "https://card-scan-lead.vercel.app/api/bot/my-contacts?phone={{recipient.mobileNo}}&limit=5",
+          "params": [],
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "urlEncoded": [],
+          "bodyType": "none",
+          "bodyJson": "{}",
+          "bodyRaw": "",
+          "formData": [],
+          "authType": "none",
+          "bearerToken": "",
+          "basicUsername": "",
+          "basicPassword": "",
+          "apiKey": ""
+        },
+        "storeResponseVariable": [
+          { "variable": "total_contacts", "variableValue": "response.total"       },
+          { "variable": "contacts_text",  "variableValue": "response.summaryText" }
+        ]
+      }
+    },
+    {
+      "id": "NODE_SHOW_CONTACTS",
+      "type": "html-template",
+      "text": "Node NODE_SHOW_CONTACTS",
+      "position": { "x": -600, "y": 600 },
+      "data": {
+        "tag": "SendText",
+        "textTagObj": {
+          "headercontent": "",
+          "textContent": "📋 *Your Recent Contacts* ({{custom.total_contacts}} total)\n\n{{custom.contacts_text}}\n\n🔗 View all:\nhttps://card-scan-lead.vercel.app/dashboard\n\nSend *hi* to go back to menu."
+        }
+      }
+    },
+    {
+      "id": "NODE_NO_CONTACTS",
+      "type": "html-template",
+      "text": "Node NODE_NO_CONTACTS",
+      "position": { "x": -600, "y": 1000 },
+      "data": {
+        "tag": "SendText",
+        "textTagObj": {
+          "headercontent": "",
+          "textContent": "📭 *No contacts yet.*\n\nYou haven't scanned any business cards yet.\n\nSend *hi* and choose *Scan Business Card* to get started! 📷"
+        }
+      }
+    },
+    {
+      "id": "NODE_INTEGRATIONS_API",
+      "type": "html-template",
+      "text": "Node NODE_INTEGRATIONS_API",
+      "position": { "x": -1200, "y": 1400 },
+      "data": {
+        "tag": "ApiRequest",
+        "apiData": {
+          "method": "GET",
+          "url": "https://card-scan-lead.vercel.app/api/bot/integration-status?phone={{recipient.mobileNo}}",
+          "params": [],
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "urlEncoded": [],
+          "bodyType": "none",
+          "bodyJson": "{}",
+          "bodyRaw": "",
+          "formData": [],
+          "authType": "none",
+          "bearerToken": "",
+          "basicUsername": "",
+          "basicPassword": "",
+          "apiKey": ""
+        },
+        "storeResponseVariable": [
+          { "variable": "sheets_status",   "variableValue": "response.sheets"   },
+          { "variable": "calendar_status", "variableValue": "response.calendar" },
+          { "variable": "gmail_status",    "variableValue": "response.gmail"    },
+          { "variable": "contacts_status", "variableValue": "response.contacts" }
+        ]
+      }
+    },
+    {
+      "id": "NODE_SHOW_INTEGRATIONS",
+      "type": "html-template",
+      "text": "Node NODE_SHOW_INTEGRATIONS",
+      "position": { "x": -600, "y": 1400 },
+      "data": {
+        "tag": "SendText",
+        "textTagObj": {
+          "headercontent": "",
+          "textContent": "🔗 *Your Integration Status*\n\n📊 Google Sheets: {{custom.sheets_status}}\n📅 Google Calendar: {{custom.calendar_status}}\n📧 Gmail: {{custom.gmail_status}}\n👤 Google Contacts: {{custom.contacts_status}}\n\n⚙️ Connect here:\nhttps://card-scan-lead.vercel.app/dashboard/integrations\n\nSend *hi* to go back."
+        }
+      }
+    },
+    {
+      "id": "NODE_HELP",
+      "type": "html-template",
+      "text": "Node NODE_HELP",
+      "position": { "x": -1200, "y": 2000 },
+      "data": {
+        "tag": "SendText",
+        "textTagObj": {
+          "headercontent": "",
+          "textContent": "❓ *How to use GridAI*\n\n1️⃣ Send *hi* to start\n2️⃣ Choose *Scan Business Card*\n3️⃣ Send a clear photo of the card\n4️⃣ AI reads name, email, phone, company\n5️⃣ Choose where to sync the contact\n\n*Quick commands:*\n• *hi* or *menu* — Main menu\n• *help* — This message\n\n🌐 Dashboard:\nhttps://card-scan-lead.vercel.app/dashboard\n\n_Powered by Groq + Mistral + Gemini AI_"
+        }
+      }
+    },
+    {
+      "id": "NODE_RESOLVE_1",
+      "type": "html-template",
+      "text": "Node NODE_RESOLVE_1",
+      "position": { "x": 3600, "y": -1200 },
+      "data": {
+        "tag": "ResolveConversation",
+        "resolveConversation": "The conversation will be marked as resolved"
+      }
+    },
+    {
+      "id": "NODE_RESOLVE_2",
+      "type": "html-template",
+      "text": "Node NODE_RESOLVE_2",
+      "position": { "x": 0, "y": 1600 },
+      "data": {
+        "tag": "ResolveConversation",
+        "resolveConversation": "The conversation will be marked as resolved"
+      }
+    },
+    {
+      "id": "NODE_RESOLVE_3",
+      "type": "html-template",
+      "text": "Node NODE_RESOLVE_3",
+      "position": { "x": -600, "y": 2200 },
+      "data": {
+        "tag": "ResolveConversation",
+        "resolveConversation": "The conversation will be marked as resolved"
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e01", "source": "1",                    "target": "NODE_WELCOME_MSG",        "sourceHandle": "source-1",                        "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "source-1", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e02", "source": "NODE_WELCOME_MSG",      "target": "NODE_MAIN_MENU",           "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e03", "source": "NODE_MAIN_MENU",        "target": "NODE_SCAN_INSTRUCTIONS",  "sourceHandle": "menu-scan-card::Scan Business Card", "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Scan Business Card" } } }, "data": { "type": "animated", "buttonId": "menu-scan-card", "buttonTitle": "Scan Business Card" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e04", "source": "NODE_MAIN_MENU",        "target": "NODE_MY_CONTACTS_API",    "sourceHandle": "menu-my-contacts::My Contacts",      "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "My Contacts" } } }, "data": { "type": "animated", "buttonId": "menu-my-contacts", "buttonTitle": "My Contacts" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e05", "source": "NODE_MAIN_MENU",        "target": "NODE_INTEGRATIONS_API",   "sourceHandle": "menu-integrations::My Integrations",  "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "My Integrations" } } }, "data": { "type": "animated", "buttonId": "menu-integrations", "buttonTitle": "My Integrations" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e06", "source": "NODE_MAIN_MENU",        "target": "NODE_HELP",               "sourceHandle": "menu-help::Help",                    "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Help" } } }, "data": { "type": "animated", "buttonId": "menu-help", "buttonTitle": "Help" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e07", "source": "NODE_SCAN_INSTRUCTIONS","target": "NODE_SCANNING_MSG",        "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e08", "source": "NODE_SCANNING_MSG",     "target": "NODE_SCAN_API",            "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e09", "source": "NODE_SCAN_API",         "target": "NODE_SCAN_SUCCESS_MSG",   "sourceHandle": "success::true",  "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "true" } } }, "data": { "type": "animated", "buttonId": "success", "buttonTitle": "true" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e10", "source": "NODE_SCAN_API",         "target": "NODE_SCAN_ERROR",         "sourceHandle": "fail::false",    "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "false" } } }, "data": { "type": "animated", "buttonId": "fail", "buttonTitle": "false" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e11", "source": "NODE_SCAN_SUCCESS_MSG", "target": "NODE_SYNC_MENU",           "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e12", "source": "NODE_SYNC_MENU",        "target": "NODE_SYNC_API",            "sourceHandle": "sync-all::Sync All",           "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Sync All" } } }, "data": { "type": "animated", "buttonId": "sync-all", "buttonTitle": "Sync All" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e13", "source": "NODE_SYNC_MENU",        "target": "NODE_SYNC_API",            "sourceHandle": "sync-sheets::Google Sheets Only","type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Google Sheets Only" } } }, "data": { "type": "animated", "buttonId": "sync-sheets", "buttonTitle": "Google Sheets Only" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e14", "source": "NODE_SYNC_MENU",        "target": "NODE_SYNC_API",            "sourceHandle": "sync-calendar::Calendar + Sheets","type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Calendar + Sheets" } } }, "data": { "type": "animated", "buttonId": "sync-calendar", "buttonTitle": "Calendar + Sheets" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e15", "source": "NODE_SYNC_MENU",        "target": "NODE_SKIP_SYNC",           "sourceHandle": "sync-skip::Skip — Save Only",  "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Skip" } } }, "data": { "type": "animated", "buttonId": "sync-skip", "buttonTitle": "Skip — Save Only" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e16", "source": "NODE_SYNC_API",         "target": "NODE_SYNC_SUCCESS",        "sourceHandle": "success::true",  "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "true" } } }, "data": { "type": "animated", "buttonId": "success", "buttonTitle": "true" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e17", "source": "NODE_SYNC_API",         "target": "NODE_SYNC_ERROR",          "sourceHandle": "fail::false",    "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "false" } } }, "data": { "type": "animated", "buttonId": "fail", "buttonTitle": "false" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e18", "source": "NODE_SYNC_SUCCESS",     "target": "NODE_SCAN_ANOTHER",        "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e19", "source": "NODE_SCAN_ANOTHER",     "target": "NODE_SCAN_INSTRUCTIONS",  "sourceHandle": "btn-scan-another::Scan Another","type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Scan Another" } } }, "data": { "type": "animated", "buttonId": "btn-scan-another", "buttonTitle": "Scan Another" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e20", "source": "NODE_SCAN_ANOTHER",     "target": "NODE_MAIN_MENU",           "sourceHandle": "btn-main-menu::Main Menu",      "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Main Menu" } } }, "data": { "type": "animated", "buttonId": "btn-main-menu", "buttonTitle": "Main Menu" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e21", "source": "NODE_SYNC_ERROR",       "target": "NODE_RESOLVE_1",           "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e22", "source": "NODE_SKIP_SYNC",        "target": "NODE_RESOLVE_1",           "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e23", "source": "NODE_SCAN_ERROR",       "target": "NODE_RESOLVE_1",           "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e24", "source": "NODE_MY_CONTACTS_API",  "target": "NODE_SHOW_CONTACTS",       "sourceHandle": "success::true",  "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "true" } } }, "data": { "type": "animated", "buttonId": "success", "buttonTitle": "true" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e25", "source": "NODE_MY_CONTACTS_API",  "target": "NODE_NO_CONTACTS",         "sourceHandle": "fail::false",    "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "false" } } }, "data": { "type": "animated", "buttonId": "fail", "buttonTitle": "false" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e26", "source": "NODE_SHOW_CONTACTS",    "target": "NODE_RESOLVE_2",           "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e27", "source": "NODE_NO_CONTACTS",      "target": "NODE_RESOLVE_2",           "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e28", "source": "NODE_INTEGRATIONS_API", "target": "NODE_SHOW_INTEGRATIONS",   "sourceHandle": "success::true",  "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "true" } } }, "data": { "type": "animated", "buttonId": "success", "buttonTitle": "true" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e29", "source": "NODE_INTEGRATIONS_API", "target": "NODE_SHOW_INTEGRATIONS",   "sourceHandle": "fail::false",    "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "false" } } }, "data": { "type": "animated", "buttonId": "fail", "buttonTitle": "false" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e30", "source": "NODE_SHOW_INTEGRATIONS","target": "NODE_RESOLVE_2",           "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e31", "source": "NODE_HELP",             "target": "NODE_RESOLVE_3",           "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } }
+  ],
+  "variables": [
+    { "key": "menu_choice",      "type": "String", "value": "" },
+    { "key": "card_name",        "type": "String", "value": "" },
+    { "key": "card_email",       "type": "String", "value": "" },
+    { "key": "card_phone",       "type": "String", "value": "" },
+    { "key": "card_company",     "type": "String", "value": "" },
+    { "key": "card_role",        "type": "String", "value": "" },
+    { "key": "card_website",     "type": "String", "value": "" },
+    { "key": "contact_id",       "type": "String", "value": "" },
+    { "key": "ai_provider",      "type": "String", "value": "" },
+    { "key": "sync_choice",      "type": "String", "value": "" },
+    { "key": "sync_status",      "type": "String", "value": "" },
+    { "key": "synced_to",        "type": "String", "value": "" },
+    { "key": "next_action",      "type": "String", "value": "" },
+    { "key": "total_contacts",   "type": "Number", "value": "" },
+    { "key": "contacts_text",    "type": "String", "value": "" },
+    { "key": "sheets_status",    "type": "String", "value": "" },
+    { "key": "calendar_status",  "type": "String", "value": "" },
+    { "key": "gmail_status",     "type": "String", "value": "" },
+    { "key": "contacts_status",  "type": "String", "value": "" }
+  ]
+}
