@@ -1,68 +1,44 @@
 import axios from 'axios';
-import { ElevenZaWebhookPayload, ElevenZaIncomingMessage, ElevenZaStatusEvent } from './types';
 
 /**
- * Parses 11za (v2) webhook payload to extract relevant content
+ * Parses 11za (v2) webhook payload to extract media content
  * @param payload The incoming webhook JSON body from 11za
- * @returns Object including sender, text, media, status events, etc.
+ * @returns Object including sender, text, and base64 encoded image
  */
-export async function parseWebhookPayload(payload: ElevenZaWebhookPayload) {
-  // 1. Handle Status Events
-  if ('status' in payload) {
-    const statusEvent = payload as ElevenZaStatusEvent;
+export async function parseWebhookPayload(payload: any) {
+  // Only process incoming messages (MoMessage)
+  if (payload?.event !== 'MoMessage' || !payload?.content) {
+    return { sender: null, isImage: false, text: '' };
+  }
+
+  const { from, content } = payload;
+  const isMediaImage = content.contentType === 'media' && content.media?.type === 'image';
+  const messageText = content.contentType === 'text' ? content.text : '';
+
+  if (!isMediaImage || !content.media?.url) {
+    return { sender: from, isImage: false, text: messageText };
+  }
+
+  const mediaUrl = content.media.url;
+
+  try {
+    // Usually these CDNs don't need auth headers to download if the URL is signed,
+    // but we can add authorization if required by 11za
+    const response = await axios.get(mediaUrl, {
+      responseType: 'arraybuffer',
+    });
+
+    const buffer = Buffer.from(response.data, 'binary');
+    const base64 = buffer.toString('base64');
+
     return {
-      type: 'status',
-      messageId: statusEvent.messageId,
-      status: statusEvent.status,
-      timestamp: statusEvent.timestamp,
+      sender: from,
+      isImage: true,
+      text: messageText,
+      base64Image: base64,
     };
+  } catch (error: any) {
+    console.error("Error downloading image from 11za URL:", error.message);
+    throw new Error("Failed to download image from 11za");
   }
-
-  // 2. Handle Incoming Messages (MoMessage or MoMessage::Postback)
-  const incoming = payload as ElevenZaIncomingMessage;
-  if (!incoming.event || !incoming.content) {
-    return { type: 'unknown', data: payload };
-  }
-
-  const { from, content, event, UserResponse, TemplateName, InteractiveMessageTitle, postback } = incoming;
-  const contentType = content.contentType;
-  const mediaType = content.media?.type;
-  
-  // Extract primary text content
-  const text = UserResponse || content.text || incoming.whatsapp?.text || incoming.whatsapp?.title || '';
-
-  const result: any = {
-    type: 'message',
-    event,
-    sender: from,
-    contentType,
-    mediaType,
-    text,
-    messageId: incoming.messageId,
-    receivedAt: incoming.receivedAt,
-    template: TemplateName,
-    interactive: InteractiveMessageTitle,
-    postback: postback?.data,
-  };
-
-  // 3. Process Image specifically for OCR
-  if (contentType === 'media' && mediaType === 'image' && content.media?.url) {
-    try {
-      const response = await axios.get(content.media.url, {
-        responseType: 'arraybuffer',
-      });
-      const buffer = Buffer.from(response.data, 'binary');
-      result.base64Image = buffer.toString('base64');
-      result.isImage = true;
-    } catch (error: any) {
-      console.error("Error downloading image from 11za URL:", error.message);
-      // We don't throw here to allow other parts of the message to still be processed
-      result.isImage = false;
-      result.downloadError = error.message;
-    }
-  } else {
-    result.isImage = false;
-  }
-
-  return result;
 }

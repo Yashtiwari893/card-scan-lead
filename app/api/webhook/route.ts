@@ -41,73 +41,32 @@ async function processWebhook(payload: any) {
   await dbConnect();
 
   try {
-    console.log("--- Webhook Triggered ---");
-    console.log("Payload:", JSON.stringify(payload, null, 2));
+    // 1. Parse payload to get sender and base64 image
+    const { sender, isImage, base64Image } = await parseWebhookPayload(payload);
 
-    // 1. Parse payload
-    const parsed = await parseWebhookPayload(payload);
-    console.log("Parsed result:", JSON.stringify(parsed, null, 2));
-
-    // 2. Status updates (delivery receipts) — just log them
-    if (parsed.type === 'status') {
-      console.log(`[STATUS] MsgID: ${parsed.messageId}, State: ${parsed.status}`);
-      return;
+    if (!isImage || !base64Image) {
+      return; // Skip if not an image message
     }
 
-    if (parsed.type !== 'message') {
-      console.warn("Received non-message event type from 11za.");
-      return;
-    }
-
-    const { sender, isImage, base64Image } = parsed;
-
-    if (!sender) {
-      console.error("Missing sender ID in payload.");
-      return;
-    }
-
-    // ⚠️  IMPORTANT: Text messages (hi, menu, help, etc.) are handled
-    // entirely by the 11za bot flow via /api/bot/* routes.
-    // Webhook ONLY processes image uploads for OCR scanning.
-    if (!isImage) {
-      console.log(`[SKIP] Non-image message from ${sender} — handled by bot flow.`);
-      return; // Do NOT send any reply here — bot flow does it
-    }
-
-    if (!base64Image) {
-      console.error("[ERROR] Image received but base64 parsing failed.");
-      return;
-    }
-
-    // 3. User lookup
-    const cleanSender = sender.replace(/\+/g, '').trim();
-    console.log(`[IMAGE] Processing card from: ${cleanSender}`);
-
-    const user = await User.findOne({
-      $or: [
-        { whatsappNumber: cleanSender },
-        { whatsappNumber: `+${cleanSender}` }
-      ]
-    });
+    // 2. Identify the user (tenant) by their WhatsApp number
+    const cleanSender = sender.replace('+', '');
+    const user = await User.findOne({ whatsappNumber: cleanSender });
 
     if (!user) {
-      console.warn(`[SKIP] Image from unregistered number: ${cleanSender}. Bot flow auto-registers on "hi".`);
-      return; // User must say "hi" first to register via bot flow
-    }
-
-    console.log(`[AUTH] User: ${user.name || user.whatsappName} (${user.plan}, ${user.scansUsed}/${user.scansLimit})`);
-
-    if (user.scansUsed >= user.scansLimit) {
-      console.warn(`[LIMIT] User scan limit reached for ${cleanSender}.`);
+      console.warn(`Received message from unknown number: ${cleanSender}`);
+      await sendWhatsAppMessage(cleanSender, "Please register at [your-domain.com] to use this service.");
       return;
     }
 
-    // 4. AI Extraction
-    console.log("[AI] Starting OCR parsing...");
-    const { data: contactData, provider } = await aiRouter.parseBusinessCard(base64Image);
-    console.log(`[AI] Success via ${provider}:`, JSON.stringify(contactData));
+    if (user.scansUsed >= user.scansLimit) {
+      await sendWhatsAppMessage(cleanSender, "❌ Scan limit reached! Please upgrade your plan.");
+      return;
+    }
 
-    // 5. DB Storage
+    // 3. Call AI parsing logic
+    const { data: contactData, provider } = await aiRouter.parseBusinessCard(base64Image);
+
+    // 4. Save to MongoDB
     const newContact = await Contact.create({
       userId: user._id,
       ...contactData,
@@ -115,25 +74,27 @@ async function processWebhook(payload: any) {
       aiProvider: provider,
       syncedTo: [],
     });
-    console.log(`[DB] Contact saved: ${newContact._id}`);
 
-    // Increment scan count
+    // 5. Update user scan count
     user.scansUsed += 1;
     await user.save();
 
-    // 6. Auto-Sync (background)
-    console.log("[SYNC] Starting Auto-Sync...");
-    autoSync(user._id.toString(), newContact._id.toString(), contactData)
-      .then(() => console.log("[SYNC] Done."))
-      .catch(e => console.error("[SYNC] Error:", e));
+    // 6. Trigger Auto-Sync async for Phase 2
+    autoSync(user._id.toString(), newContact._id.toString(), contactData).catch(e => console.error("AutoSync Error:", e));
 
-    // NOTE: No WhatsApp reply sent here.
-    // The scan result is returned via /api/bot/scan-card which the bot flow calls.
-    // This webhook path handles the raw image upload only.
-    console.log(`[DONE] Card processed for ${cleanSender}, contactId: ${newContact._id}`);
+    // 7. Send confirmation reply (sync status updates in DB asynchronously)
+    const confirmMessage = `✅ Card scanned!
+👤 Name: ${contactData.name || 'N/A'}
+🏢 Company: ${contactData.company || 'N/A'}
+💼 Role: ${contactData.jobTitle || 'N/A'}
+📧 Email: ${contactData.email || 'N/A'}
+📞 Phone: ${contactData.phone || 'N/A'}
+🔗 Syncing to connected Google services...`;
+
+    await sendWhatsAppMessage(cleanSender, confirmMessage);
 
   } catch (error: any) {
-    console.error("Critical Webhook Error:", error);
+    console.error("Webhook logic failure:", error);
   }
 }
 
