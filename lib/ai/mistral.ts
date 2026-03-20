@@ -19,8 +19,8 @@ export async function parseWithMistral(base64Image: string) {
           { type: "text", text: prompt },
           {
             type: "image_url",
-            image_url: `data:image/jpeg;base64,${base64Image}`,
-          },
+            imageUrl: `data:image/jpeg;base64,${base64Image}`,
+          } as any,
         ],
       },
     ],
