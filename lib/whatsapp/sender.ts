@@ -4,7 +4,7 @@ const API_KEY = process.env.ELEVENZA_API_KEY;
 const ORIGIN_WEBSITE = process.env.ORIGIN_WEBSITE || 'https://www.displ.in/';
 
 /**
- * Sends a WhatsApp message via 11za REST API
+ * Sends a WhatsApp message via 11za REST API (Updated format)
  * @param to Recipient's phone number (with country code, no +)
  * @param message Message text to send
  */
@@ -14,21 +14,23 @@ export async function sendWhatsAppMessage(to: string, message: string) {
     return { success: false, error: "API Key missing" };
   }
 
-  // Update to the endpoint shown in typical 11za standard setups
-  // If the user has a specific instance, they might need to change the domain.
-  const url = `https://app.11za.in/apis/message/sendMessage`;
+  // CORRECT 11ZA API ENDPOINT
+  const url = `https://api.11za.in/apis/session/sendMessage/`;
 
   try {
     const response = await axios.post(
       url,
       {
-        phone: to,
+        sendto: to.replace('+', '').trim(),
+        authToken: API_KEY,
+        originWebsite: ORIGIN_WEBSITE,
         message: message,
       },
       {
         headers: {
-          'Authorization': `Bearer ${API_KEY}`,
           'Content-Type': 'application/json',
+          // Optional: Some 11za APIs still check headers
+          'Authorization': `Bearer ${API_KEY}`,
           'origin-website': ORIGIN_WEBSITE
         },
       }
