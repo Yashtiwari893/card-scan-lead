@@ -50,6 +50,39 @@
       }
     },
     {
+      "id": "NODE_AUTO_REGISTER",
+      "type": "html-template",
+      "text": "Node NODE_AUTO_REGISTER",
+      "position": { "x": -2700, "y": 0 },
+      "data": {
+        "tag": "ApiRequest",
+        "apiData": {
+          "method": "GET",
+          "url": "https://card-scan-lead.vercel.app/api/bot/check-user?phone={{recipient.mobileNo}}&name={{recipient.name}}",
+          "params": [],
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "urlEncoded": [],
+          "bodyType": "none",
+          "bodyJson": "{}",
+          "bodyRaw": "",
+          "formData": [],
+          "authType": "none",
+          "bearerToken": "",
+          "basicUsername": "",
+          "basicPassword": "",
+          "apiKey": ""
+        },
+        "storeResponseVariable": [
+          { "variable": "user_name",        "variableValue": "response.name"           },
+          { "variable": "user_plan",        "variableValue": "response.plan"           },
+          { "variable": "scans_used",       "variableValue": "response.scansUsed"      },
+          { "variable": "scans_limit",      "variableValue": "response.scansLimit"     },
+          { "variable": "scans_remaining",  "variableValue": "response.scansRemaining" },
+          { "variable": "is_new_user",      "variableValue": "response.isNew"          }
+        ]
+      }
+    },
+    {
       "id": "NODE_WELCOME_MSG",
       "type": "html-template",
       "text": "Node NODE_WELCOME_MSG",
@@ -58,7 +91,7 @@
         "tag": "SendText",
         "textTagObj": {
           "headercontent": "",
-          "textContent": "👋 Welcome to *GridAI* — Smart Business Card Scanner!\n\n🤖 Powered by Groq + Mistral + Gemini AI\n\nI can scan any business card and automatically save contacts to:\n📊 Google Sheets\n📅 Google Calendar\n📧 Gmail\n👤 Google Contacts\n\nSend me a photo of any business card to get started! 📸"
+          "textContent": "👋 Welcome, *{{custom.user_name}}*!\n\n🤖 *GridAI* — Smart Business Card Scanner\nPowered by Groq + Mistral + Gemini AI\n\nI can scan any business card and save contacts to:\n📊 Google Sheets\n📅 Google Calendar\n📧 Gmail\n👤 Google Contacts\n\n📊 Scans: *{{custom.scans_used}}/{{custom.scans_limit}}* used\n\nSend a photo of any business card to get started! 📸"
         }
       }
     },
@@ -481,8 +514,9 @@
     }
   ],
   "edges": [
-    { "id": "e01", "source": "1",                    "target": "NODE_WELCOME_MSG",        "sourceHandle": "source-1",                        "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "source-1", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } },
-    { "id": "e02", "source": "NODE_WELCOME_MSG",      "target": "NODE_MAIN_MENU",           "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e01",  "source": "1",                    "target": "NODE_AUTO_REGISTER",      "sourceHandle": "source-1",                        "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "source-1", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e01b", "source": "NODE_AUTO_REGISTER",   "target": "NODE_WELCOME_MSG",         "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Auto-Registered" } } }, "data": { "type": "animated", "buttonId": "", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } },
+    { "id": "e02",  "source": "NODE_WELCOME_MSG",      "target": "NODE_MAIN_MENU",           "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } },
     { "id": "e03", "source": "NODE_MAIN_MENU",        "target": "NODE_SCAN_INSTRUCTIONS",  "sourceHandle": "menu-scan-card::Scan Business Card", "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Scan Business Card" } } }, "data": { "type": "animated", "buttonId": "menu-scan-card", "buttonTitle": "Scan Business Card" }, "markers": { "end": { "type": "arrow-closed" } } },
     { "id": "e04", "source": "NODE_MAIN_MENU",        "target": "NODE_MY_CONTACTS_API",    "sourceHandle": "menu-my-contacts::My Contacts",      "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "My Contacts" } } }, "data": { "type": "animated", "buttonId": "menu-my-contacts", "buttonTitle": "My Contacts" }, "markers": { "end": { "type": "arrow-closed" } } },
     { "id": "e05", "source": "NODE_MAIN_MENU",        "target": "NODE_INTEGRATIONS_API",   "sourceHandle": "menu-integrations::My Integrations",  "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "My Integrations" } } }, "data": { "type": "animated", "buttonId": "menu-integrations", "buttonTitle": "My Integrations" }, "markers": { "end": { "type": "arrow-closed" } } },
@@ -514,6 +548,12 @@
     { "id": "e31", "source": "NODE_HELP",             "target": "NODE_RESOLVE_3",           "type": "template", "curve": "bezier", "edgeLabels": { "center": { "type": "html-template", "data": { "type": "text", "text": "Connected" } } }, "data": { "type": "animated", "buttonId": "", "buttonTitle": "" }, "markers": { "end": { "type": "arrow-closed" } } }
   ],
   "variables": [
+    { "key": "user_name",        "type": "String", "value": "" },
+    { "key": "user_plan",        "type": "String", "value": "" },
+    { "key": "scans_used",       "type": "Number", "value": "" },
+    { "key": "scans_limit",      "type": "Number", "value": "" },
+    { "key": "scans_remaining",  "type": "Number", "value": "" },
+    { "key": "is_new_user",      "type": "String", "value": "" },
     { "key": "menu_choice",      "type": "String", "value": "" },
     { "key": "card_name",        "type": "String", "value": "" },
     { "key": "card_email",       "type": "String", "value": "" },
