@@ -14,6 +14,25 @@ import { sendFollowUpEmail } from '@/lib/google/gmail';
 import { saveToGoogleContacts } from '@/lib/google/contacts';
 
 /**
+ * Handle 11za initial Webhook verification request
+ */
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const mode = searchParams.get('hub.mode');
+  const token = searchParams.get('hub.verify_token');
+  const challenge = searchParams.get('hub.challenge');
+
+  // Verify against the secret in environment. (11za Hub verification)
+  const VERIFY_TOKEN = process.env.ELEVENZA_WEBHOOK_SECRET || 'your_verify_token';
+
+  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+    return new NextResponse(challenge, { status: 200 });
+  }
+
+  return NextResponse.json({ error: 'Verification failed' }, { status: 403 });
+}
+
+/**
  * WhatsApp Business API Webhook handler for 11za
  * POST /api/webhook
  */

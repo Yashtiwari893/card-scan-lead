@@ -18,9 +18,12 @@ export async function sendWhatsAppMessage(to: string, message: string) {
     const response = await axios.post(
       url,
       {
-        number: to,
-        message: message,
-        sender: SENDER_NUMBER, // Some versions of 11za API might need the sender number
+        sendto: to,
+        name: message,
+        authToken: API_KEY, // Map your env key to the field 11za expects
+        originWebsite: process.env.NEXTAUTH_URL || "https://card-scan-lead.vercel.app",
+        language: "en",
+        templateName: "api_text_message", // Placeholder if 11za requires this exact field even for text
       },
       {
         headers: {
