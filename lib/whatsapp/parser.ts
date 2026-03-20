@@ -6,19 +6,20 @@ import axios from 'axios';
  * @returns Object including sender, text, and base64 encoded image
  */
 export async function parseWebhookPayload(payload: any) {
-  // Check if payload has the expected 11za structure
-  if (payload?.event !== 'message' || !payload?.data) {
+  // Only process incoming messages (MoMessage)
+  if (payload?.event !== 'MoMessage' || !payload?.content) {
     return { sender: null, isImage: false, text: '' };
   }
 
-  const { from, type, image, text } = payload.data;
-  const messageText = text?.body || '';
+  const { from, content } = payload;
+  const isMediaImage = content.contentType === 'media' && content.media?.type === 'image';
+  const messageText = content.contentType === 'text' ? content.text : '';
 
-  if (type !== 'image' || !image?.url) {
+  if (!isMediaImage || !content.media?.url) {
     return { sender: from, isImage: false, text: messageText };
   }
 
-  const mediaUrl = image.url;
+  const mediaUrl = content.media.url;
 
   try {
     // Usually these CDNs don't need auth headers to download if the URL is signed,
