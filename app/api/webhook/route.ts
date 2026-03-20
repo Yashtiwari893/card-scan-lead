@@ -41,14 +41,26 @@ async function processWebhook(payload: any) {
   await dbConnect();
 
   try {
-    // 1. Parse payload to get sender and base64 image
-    const { sender, isImage, base64Image } = await parseWebhookPayload(payload);
+    // 1. Parse payload to get structured data
+    const parsed = await parseWebhookPayload(payload);
 
-    if (!isImage || !base64Image) {
-      return; // Skip if not an image message
+    // 2. Handle status updates (optional: log or update DB)
+    if (parsed.type === 'status') {
+      console.log(`Message ${parsed.messageId} status update: ${parsed.status}`);
+      // You could update a 'Message' model here if you track outbound messages
+      return;
     }
 
-    // 2. Identify the user (tenant) by their WhatsApp number
+    if (parsed.type !== 'message') {
+      console.warn("Received unknown event type from 11za:", parsed);
+      return;
+    }
+
+    const { sender, isImage, base64Image, text, event, contentType, mediaType } = parsed;
+
+    if (!sender) return;
+
+    // 3. Identify the user (tenant) by their WhatsApp number
     const cleanSender = sender.replace('+', '');
     const user = await User.findOne({ whatsappNumber: cleanSender });
 
@@ -58,15 +70,30 @@ async function processWebhook(payload: any) {
       return;
     }
 
+    // 4. Handle non-image messages (like business card request or help)
+    if (!isImage) {
+      if (text?.toLowerCase().includes('help')) {
+        await sendWhatsAppMessage(cleanSender, "Send me a photo of a business card and I'll extract the details for you!");
+      } else {
+        await sendWhatsAppMessage(cleanSender, "Please send a photo of a business card (Image) to extract contact details.");
+      }
+      return;
+    }
+
+    if (!base64Image) {
+      await sendWhatsAppMessage(cleanSender, "❌ Failed to process image. Please try sending it again.");
+      return;
+    }
+
     if (user.scansUsed >= user.scansLimit) {
       await sendWhatsAppMessage(cleanSender, "❌ Scan limit reached! Please upgrade your plan.");
       return;
     }
 
-    // 3. Call AI parsing logic
+    // 5. Call AI parsing logic
     const { data: contactData, provider } = await aiRouter.parseBusinessCard(base64Image);
 
-    // 4. Save to MongoDB
+    // 6. Save to MongoDB
     const newContact = await Contact.create({
       userId: user._id,
       ...contactData,
@@ -75,14 +102,14 @@ async function processWebhook(payload: any) {
       syncedTo: [],
     });
 
-    // 5. Update user scan count
+    // 7. Update user scan count
     user.scansUsed += 1;
     await user.save();
 
-    // 6. Trigger Auto-Sync async for Phase 2
+    // 8. Trigger Auto-Sync async for Phase 2
     autoSync(user._id.toString(), newContact._id.toString(), contactData).catch(e => console.error("AutoSync Error:", e));
 
-    // 7. Send confirmation reply (sync status updates in DB asynchronously)
+    // 9. Send confirmation reply
     const confirmMessage = `✅ Card scanned!
 👤 Name: ${contactData.name || 'N/A'}
 🏢 Company: ${contactData.company || 'N/A'}
