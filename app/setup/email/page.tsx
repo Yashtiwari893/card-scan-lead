@@ -4,8 +4,8 @@ import SetupToken from '@/lib/db/models/SetupToken';
 import User from '@/lib/db/models/User';
 import { getOAuthClient } from '@/lib/google/oauth';
 
-export default async function EmailSetupPage({ searchParams }: { searchParams: { token?: string } }) {
-  const token = searchParams.token;
+export default async function EmailSetupPage({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
+  const { token } = await searchParams;
   if (!token) return <SetupError message="Invalid setup token provided." />;
 
   await dbConnect();

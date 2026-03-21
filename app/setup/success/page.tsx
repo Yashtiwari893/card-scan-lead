@@ -1,5 +1,5 @@
-export default function SetupSuccessPage({ searchParams }: { searchParams: { service?: string } }) {
-  const service = searchParams.service || 'Integration';
+export default async function SetupSuccessPage({ searchParams }: { searchParams: Promise<{ service?: string }> }) {
+  const { service = 'Integration' } = await searchParams;
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">

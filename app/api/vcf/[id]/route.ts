@@ -3,10 +3,11 @@ import dbConnect from '@/lib/db/mongodb';
 import Contact from '@/lib/db/models/Contact';
 import { generateVCF } from '@/lib/whatsapp/vcf';
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   try {
     await dbConnect();
-    const contact = await Contact.findById(params.id);
+    const contact = await Contact.findById(id);
 
     if (!contact) {
       return new NextResponse("Contact not found", { status: 404 });
