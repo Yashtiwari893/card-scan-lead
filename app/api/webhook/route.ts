@@ -19,6 +19,11 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// Helper to generate a unique 6-digit referral code
+function generateReferCode() {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
 async function processWebhook(payload: any) {
   await dbConnect();
   const { sender, isImage, text, base64Image } = await parseWebhookPayload(payload);
@@ -27,19 +32,43 @@ async function processWebhook(payload: any) {
   const cleanSender = sender.replace('+', '').trim();
   let user = await User.findOne({ whatsappNumber: cleanSender });
 
-  // STATE MACHINE START
-  
-  // 1. Initial State / "hi" trigger
-  if (!user || text?.toLowerCase() === 'hi' || text?.toLowerCase() === 'hello') {
+  // 1. Initial State / "hi" trigger with Referral Check
+  if (!user || text?.toLowerCase().startsWith('hi')) {
+    const isNew = !user;
+    let referralTag = "";
+    
+    // Check if "hi code" like "hi RFR123"
+    if (text?.toLowerCase().includes(' ')) {
+      referralTag = text.split(' ')[1].toUpperCase().trim();
+    }
+
     if (!user) {
-      user = await User.create({ whatsappNumber: cleanSender, botState: 'new' });
+      user = await User.create({ 
+        whatsappNumber: cleanSender, 
+        botState: 'new',
+        referralCode: generateReferCode(),
+        referredBy: referralTag || null,
+        scanCredits: referralTag ? 10 : 5 // Bonus for using referral
+      });
+      
+      // Reward the referrer if credit awarded
+      if (referralTag) {
+        const referrer = await User.findOne({ referralCode: referralTag });
+        if (referrer) {
+          referrer.scanCredits += 10;
+          referrer.referralCount += 1;
+          await referrer.save();
+          // Notify referrer (Optionally)
+          await sendWhatsAppMessage(referrer.whatsappNumber, `🎉 Great news! Someone used your referral. You've earned 10 additional scan credits! 🎁`);
+        }
+      }
     }
     
-    // Check if transition to awaiting_email is needed
     if (user.botState === 'new' || text?.toLowerCase() === 'hi') {
       user.botState = 'awaiting_email';
       await user.save();
-      await sendWhatsAppMessage(cleanSender, "Welcome to Grid AI 👋\nPlease share your email to complete your signup and get started with your free card scans.");
+      const bonusMsg = referralTag ? ` (Wait, I see you used a referral! You got 10 scans instead of 5 🎁)` : "";
+      await sendWhatsAppMessage(cleanSender, `Welcome to Grid AI 👋${bonusMsg}\nPlease share your email to complete your signup.`);
       return;
     }
   }
@@ -49,42 +78,31 @@ async function processWebhook(payload: any) {
     user.email = text.trim();
     user.botState = 'active';
     await user.save();
-    const welcome = `Awesome! 🎉 You're now officially on the GRID AI insider list 😎\nYou can now upload a picture of a business card to start scanning!`;
+    const welcome = `Awesome! 🎉 You're officially on the GRID AI insider list 😎\nYou can now upload a business card image to scan. Current Credits: *${user.scanCredits}*`;
     await sendWhatsAppMessage(cleanSender, welcome);
     return;
   }
 
-  // 3. Active State (Menu, Scan, NL Calendar)
+  // 3. Active State
   if (user.botState === 'active') {
     
-    // Handle "M" or "menu"
-    if (text?.toLowerCase() === 'm' || text?.toLowerCase() === 'menu') {
-      await sendWhatsAppMessage(cleanSender, "Main Menu 📋\n\n- Scan a Business Card\n- Do more with Grid\n- Buy Credits\n\nReply with the option name.");
-      return;
-    }
-
-    // Handle "Do more with Grid" menu items
-    if (text === 'Do more with Grid') {
-       const msg = "List menu:\n- Sheet Setup\n- Calendar Setup\n- Email Setup\n- Enable Front/Back\n- Enable Translation\n- Refer and Earn";
-       await sendWhatsAppMessage(cleanSender, msg);
+    // Command: Refer and Earn
+    if (text?.toLowerCase() === 'refer and earn') {
+       const refLink = `https://wa.me/${process.env.ELEVENZA_PHONE_NUMBER}?text=hi%20${user.referralCode}`;
+       const stats = `🎁 *Refer and Earn* 🎁\n\nInvite your friends and earn *10 scan credits* per referral! Your friend also gets 10 scans.\n\nYour Referral Code: *${user.referralCode}*\nYour Referrals: *${user.referralCount}*\n\nShare this link:\n${refLink}`;
+       await sendWhatsAppMessage(cleanSender, stats);
        return;
     }
 
-    if (text?.toLowerCase().includes('sheet setup')) {
-      const res = await fetch(`https://card-scan-lead.vercel.app/api/integrations/short-link`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user._id, type: 'sheets' })
-      });
-      const data = await res.json();
-      await sendWhatsAppMessage(cleanSender, `Click the link below to connect your Google Sheets:\n${data.shortUrl}`);
+    if (text?.toLowerCase() === 'm' || text?.toLowerCase() === 'menu') {
+      await sendWhatsAppMessage(cleanSender, "Main Menu 📋\n\n- Scan a Business Card\n- Do more with Grid\n- Refer and Earn\n- Buy Credits");
       return;
     }
 
-    // Handle Card Scanning (Image)
+    // Handle Image Scan...
     if (isImage && base64Image) {
       if (user.scanCredits <= 0) {
-        await sendWhatsAppMessage(cleanSender, "❌ Scan credits exhausted! Please buy more credits.");
+        await sendWhatsAppMessage(cleanSender, "❌ Scan credits exhausted! Refer friends or buy credits.");
         return;
       }
 
@@ -100,25 +118,14 @@ async function processWebhook(payload: any) {
       user.scansUsed += 1;
       await user.save();
 
-      // Trigger Auto-Sync (Historical too if needed but handled elsewhere)
       autoSync(user._id.toString(), newContact._id.toString(), contactData);
 
-      const confirm = `Name: *${contactData.name || 'N/A'}*\nBusiness: *${contactData.company || 'N/A'}*\nEmail: ${contactData.email || 'N/A'}\nContact: *${contactData.phone || 'N/A'}*\n\n_Credits left: *${user.scanCredits}*_`;
+      const confirm = `Name: *${contactData.name || 'N/A'}*\nBusiness: *${contactData.company || 'N/A'}*\nEmail: ${contactData.email || 'N/A'}\n\n_Credits left: *${user.scanCredits}*_`;
       await sendWhatsAppMessage(cleanSender, confirm);
 
       const vcfUrl = `https://card-scan-lead.vercel.app/api/vcf/${newContact._id}`;
       await sendWhatsAppDocument(cleanSender, vcfUrl, `${contactData.name || 'contact'}.vcf`);
       return;
-    }
-
-    // Handle Natural Language Calendar (Simple Placeholder Logic for now or use AI)
-    if (text && (text.toLowerCase().includes('schedule') || text.toLowerCase().includes('meeting') || text.toLowerCase().includes('tomorrow'))) {
-       // Ideally parse with Gemini here
-       await sendWhatsAppMessage(cleanSender, "📅 Detecting meeting details... I'll set up a follow-up for you!");
-       // Generic follow up for now
-       await createFollowUpEvent(user._id.toString(), { name: 'User Request', email: '', phone: '', company: '', jobTitle: '', website: '' });
-       await sendWhatsAppMessage(cleanSender, "✅ Meeting scheduled 3 days from now as a follow-up! You can check your Google Calendar.");
-       return;
     }
   }
 }
