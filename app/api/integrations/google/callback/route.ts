@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOAuthClient } from '@/lib/google/oauth';
 import dbConnect from '@/lib/db/mongodb';
 import Integration from '@/lib/db/models/Integration';
+import { syncHistoricalContacts } from '@/lib/google/sheets';
 
 /**
  * Handle Google OAuth callback
@@ -37,6 +38,11 @@ export async function GET(req: NextRequest) {
       },
       { upsert: true, new: true } // Create if doesn't exist, update if it does
     );
+
+    // Trigger retroactive sync for old contacts asynchronously
+    if (tokens.scope?.includes('spreadsheets')) {
+      syncHistoricalContacts(userId).catch(err => console.error("Auto Historical Sync Error:", err));
+    }
 
     // Determine service for success message
     const service = tokens.scope?.includes('spreadsheets') ? 'sheets' : 
