@@ -25,7 +25,7 @@ export async function parseWithGroq(base64Image: string) {
         ],
       },
     ],
-    model: "llama-3.2-11b-vision-instant",
+    model: "llama-3.2-90b-vision-preview",
     response_format: { type: "json_object" },
   });
 
