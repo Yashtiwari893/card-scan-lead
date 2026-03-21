@@ -7,7 +7,7 @@ export interface IUser extends Document {
   plan: 'free' | 'pro';
   scansUsed: number;
   scansLimit: number;
-  state: 'new' | 'awaiting_email' | 'active';
+  botState: 'new' | 'awaiting_email' | 'active';
   scanCredits: number;
   isFirstScan: boolean;
   createdAt: Date;
@@ -21,7 +21,7 @@ const UserSchema: Schema = new Schema({
   plan: { type: String, enum: ['free', 'pro'], default: 'free' },
   scansUsed: { type: Number, default: 0 },
   scansLimit: { type: Number, default: 10 },
-  state: { type: String, enum: ['new', 'awaiting_email', 'active'], default: 'new' },
+  botState: { type: String, enum: ['new', 'awaiting_email', 'active'], default: 'new' },
   scanCredits: { type: Number, default: 5 },
   isFirstScan: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },

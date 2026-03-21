@@ -72,7 +72,8 @@ export async function POST(req: NextRequest) {
       aiProvider: provider,
       scanCreditsLeft: user.scanCredits,
       isFirstScan: isFirstScan,
-      vcfString: vcfString
+      vcfString: vcfString,
+      vcfBase64: Buffer.from(vcfString).toString('base64'),
     });
 
   } catch (error: any) {

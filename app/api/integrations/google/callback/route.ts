@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOAuthClient } from '@/lib/google/oauth';
 import dbConnect from '@/lib/db/mongodb';
 import Integration from '@/lib/db/models/Integration';
+import User from '@/lib/db/models/User';
 import { syncHistoricalContacts } from '@/lib/google/sheets';
+import { sendWhatsAppMessage } from '@/lib/whatsapp/sender';
 
 /**
  * Handle Google OAuth callback
@@ -48,6 +50,17 @@ export async function GET(req: NextRequest) {
     const service = tokens.scope?.includes('spreadsheets') ? 'sheets' : 
                     tokens.scope?.includes('calendar') ? 'calendar' : 
                     tokens.scope?.includes('gmail') ? 'email' : 'integration';
+
+    // Notify user on WhatsApp
+    try {
+      const user = await User.findById(userId);
+      if (user && user.whatsappNumber) {
+        const successNotify = `✅ Your Google ${service.charAt(0).toUpperCase() + service.slice(1)} connected successfully!\nAll your business cards will now sync automatically. 🚀`;
+        await sendWhatsAppMessage(user.whatsappNumber, successNotify);
+      }
+    } catch (err) {
+      console.error("WhatsApp notification error:", err);
+    }
 
     // Redirect to frontend on success
     return NextResponse.redirect(new URL(`/setup/success?connected=true&service=${service}`, req.url));
