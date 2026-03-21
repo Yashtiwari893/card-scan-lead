@@ -5,7 +5,7 @@ import Contact from '@/lib/db/models/Contact';
 import Integration from '@/lib/db/models/Integration';
 import aiRouter from '@/lib/ai/aiRouter';
 import { parseWebhookPayload } from '@/lib/whatsapp/parser';
-import { sendWhatsAppMessage } from '@/lib/whatsapp/sender';
+import { sendWhatsAppMessage, sendWhatsAppDocument } from '@/lib/whatsapp/sender';
 
 // Auto-Sync Phase 2 Imports
 import { appendContactToSheet } from '@/lib/google/sheets';
@@ -41,62 +41,136 @@ async function processWebhook(payload: any) {
   await dbConnect();
 
   try {
-    // 1. Parse payload to get sender and base64 image
-    const { sender, isImage, base64Image } = await parseWebhookPayload(payload);
+    const { sender, isImage, text, base64Image } = await parseWebhookPayload(payload);
+    if (!sender) return;
 
-    if (!isImage || !base64Image) {
-      return; // Skip if not an image message
-    }
+    const cleanSender = sender.replace('+', '').trim();
+    let user = await User.findOne({ whatsappNumber: cleanSender });
 
-    // 2. Identify the user (tenant) by their WhatsApp number
-    const cleanSender = sender.replace('+', '');
-    const user = await User.findOne({ whatsappNumber: cleanSender });
-
-    if (!user) {
-      console.warn(`Received message from unknown number: ${cleanSender}`);
-      await sendWhatsAppMessage(cleanSender, "Please register at [your-domain.com] to use this service.");
+    // Handle initial greeting "hi" or "hello"
+    if (text?.toLowerCase() === 'hi' || text?.toLowerCase() === 'hello') {
+      if (!user) {
+        user = await User.create({
+          whatsappNumber: cleanSender,
+          state: 'awaiting_email',
+          scanCredits: 5,
+        });
+      }
+      
+      const welcomeMsg = `Welcome to Grid AI 👋\nPlease share your email to complete \nyour signup and get started with \nyour free card scans.`;
+      await sendWhatsAppMessage(cleanSender, welcomeMsg);
       return;
     }
 
-    if (user.scansUsed >= user.scansLimit) {
-      await sendWhatsAppMessage(cleanSender, "❌ Scan limit reached! Please upgrade your plan.");
+    // Handle email submission during onboarding
+    if (user?.state === 'awaiting_email' && text?.includes('@')) {
+      const email = text.trim();
+      user.email = email;
+      user.state = 'active';
+      await user.save();
+
+      const successMsg = `Awesome! 🎉 You're now officially \non the GRID AI insider list 😎\nYou can now upload a picture of \nbusiness card to start scanning`;
+      await sendWhatsAppMessage(cleanSender, successMsg);
       return;
     }
 
-    // 3. Call AI parsing logic
-    const { data: contactData, provider } = await aiRouter.parseBusinessCard(base64Image);
+    // Handle "M" or "menu"
+    if (text?.toLowerCase() === 'm' || text?.toLowerCase() === 'menu') {
+      await sendMainMenu(cleanSender);
+      return;
+    }
 
-    // 4. Save to MongoDB
-    const newContact = await Contact.create({
-      userId: user._id,
-      ...contactData,
-      rawText: JSON.stringify(contactData),
-      aiProvider: provider,
-      syncedTo: [],
-    });
+    // Handle Menu Options
+    if (text === 'Do more with Grid') {
+      const moreMsg = `List menu:\n- Sheet Setup\n- Calendar Setup\n- Email Setup\n- Enable Front/Back\n- Enable Translation\n- Refer and Earn\n- Create Business Profile`;
+      await sendWhatsAppMessage(cleanSender, moreMsg);
+      return;
+    }
 
-    // 5. Update user scan count
-    user.scansUsed += 1;
-    await user.save();
+    if (text === 'Sheet Setup') {
+      const shortLink = await generateShortLink(user?._id.toString(), 'sheets');
+      await sendWhatsAppMessage(cleanSender, `Click the link below to \nsee your drive setup.\n${shortLink}`);
+      return;
+    }
 
-    // 6. Trigger Auto-Sync async for Phase 2
-    autoSync(user._id.toString(), newContact._id.toString(), contactData).catch(e => console.error("AutoSync Error:", e));
+    // Handle Card Scanning (Image)
+    if (isImage && base64Image) {
+      if (!user || user.state !== 'active') {
+        await sendWhatsAppMessage(cleanSender, "Please say 'hi' to get started first!");
+        return;
+      }
 
-    // 7. Send confirmation reply (sync status updates in DB asynchronously)
-    const confirmMessage = `✅ Card scanned!
-👤 Name: ${contactData.name || 'N/A'}
-🏢 Company: ${contactData.company || 'N/A'}
-💼 Role: ${contactData.jobTitle || 'N/A'}
-📧 Email: ${contactData.email || 'N/A'}
-📞 Phone: ${contactData.phone || 'N/A'}
-🔗 Syncing to connected Google services...`;
+      if (user.scanCredits <= 0) {
+        await sendWhatsAppMessage(cleanSender, "❌ Scan credits exhausted! Please buy more credits to continue.");
+        return;
+      }
 
-    await sendWhatsAppMessage(cleanSender, confirmMessage);
+      // 3. Call AI parsing logic
+      const { data: contactData, provider } = await aiRouter.parseBusinessCard(base64Image);
+
+      // 4. Save to MongoDB
+      const newContact = await Contact.create({
+        userId: user._id,
+        ...contactData,
+        rawText: JSON.stringify(contactData),
+        aiProvider: provider,
+        syncedTo: [],
+      });
+
+      // 5. Update user scan count and credits
+      user.scansUsed += 1;
+      user.scanCredits -= 1;
+      await user.save();
+
+      // 6. Trigger Auto-Sync
+      autoSync(user._id.toString(), newContact._id.toString(), contactData).catch(e => console.error("AutoSync Error:", e));
+
+      // 7. Send confirmation reply
+      const confirmMessage = `Name: *${contactData.name || 'N/A'}*\nBusiness: *${contactData.company || 'N/A'}*\nDesignation: *${contactData.jobTitle || 'N/A'}*\nEmail: ${contactData.email || 'N/A'}\nWebsite: ${contactData.website || 'N/A'}\nContact: *${contactData.phone || 'N/A'}*\n\n_You have *${user.scanCredits}* scan credits left!_\nReply 'M' for main menu`;
+
+      await sendWhatsAppMessage(cleanSender, confirmMessage);
+
+      // 8. Send VCF file
+      const vcfUrl = `https://card-scan-lead.vercel.app/api/vcf/${newContact._id}`;
+      await sendWhatsAppDocument(cleanSender, vcfUrl, `${contactData.name || 'contact'}.vcf`, "Save Contact");
+
+      // 9. Send follow-up message if first scan
+      if (user.isFirstScan) {
+        const firstScanMsg = `✅ Great job! You've just scanned \nyour first business card.\nNow, let's connect your Google Sheets \nand Calendar to streamline your \nfollow-ups.\nReply 'M' for main menu\n\n- Scan a Business Card\n- Do more with Grid\n- Buy Credits`;
+        await sendWhatsAppMessage(cleanSender, firstScanMsg);
+        user.isFirstScan = false;
+        await user.save();
+      }
+
+      return;
+    }
 
   } catch (error: any) {
     console.error("Webhook logic failure:", error);
   }
 }
+
+async function sendMainMenu(to: string) {
+  const menuMsg = `Main Menu 📋\n\n- Scan a Business Card\n- Do more with Grid\n- Buy Credits\n\nReply with the option name.`;
+  await sendWhatsAppMessage(to, menuMsg);
+}
+
+async function generateShortLink(userId: string | undefined, type: string) {
+  if (!userId) return "https://card-scan-lead.vercel.app/dashboard";
+  
+  try {
+    const res = await fetch(`https://card-scan-lead.vercel.app/api/integrations/short-link`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, type }),
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    return data.shortUrl;
+  } catch (e) {
+    return "https://card-scan-lead.vercel.app/dashboard";
+  }
+}
+
 
 /**
  * Fires all connected integrations for a user asynchronously

@@ -2,21 +2,28 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IUser extends Document {
   name?: string;
-  email: string;
+  email?: string;
   whatsappNumber?: string;
   plan: 'free' | 'pro';
   scansUsed: number;
   scansLimit: number;
+  state: 'new' | 'awaiting_email' | 'active';
+  scanCredits: number;
+  isFirstScan: boolean;
   createdAt: Date;
 }
 
 const UserSchema: Schema = new Schema({
   name: { type: String },
-  email: { type: String, required: true, unique: true },
-  whatsappNumber: { type: String },
+  email: { type: String, required: false, unique: true, sparse: true },
+  whatsappNumber: { type: String, unique: true },
+
   plan: { type: String, enum: ['free', 'pro'], default: 'free' },
   scansUsed: { type: Number, default: 0 },
   scansLimit: { type: Number, default: 10 },
+  state: { type: String, enum: ['new', 'awaiting_email', 'active'], default: 'new' },
+  scanCredits: { type: Number, default: 5 },
+  isFirstScan: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
 });
 

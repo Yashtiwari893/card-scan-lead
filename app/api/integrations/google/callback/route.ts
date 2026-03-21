@@ -38,10 +38,15 @@ export async function GET(req: NextRequest) {
       { upsert: true, new: true } // Create if doesn't exist, update if it does
     );
 
+    // Determine service for success message
+    const service = tokens.scope?.includes('spreadsheets') ? 'sheets' : 
+                    tokens.scope?.includes('calendar') ? 'calendar' : 
+                    tokens.scope?.includes('gmail') ? 'email' : 'integration';
+
     // Redirect to frontend on success
-    return NextResponse.redirect(new URL('/dashboard/integrations?connected=true', req.url));
+    return NextResponse.redirect(new URL(`/setup/success?connected=true&service=${service}`, req.url));
   } catch (error: any) {
     console.error("OAuth Callback Exchange Error:", error);
-    return NextResponse.redirect(new URL('/dashboard/integrations?error=oauth_failed', req.url));
+    return NextResponse.redirect(new URL('/setup/success?error=oauth_failed', req.url));
   }
 }
