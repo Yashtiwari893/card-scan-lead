@@ -12,11 +12,14 @@ import { parseWithGemini } from "./gemini";
  * @returns Parsed JSON contact object and the name of provider used
  */
 export async function parseBusinessCard(base64Image: string) {
+  const errors: string[] = [];
+
   // 1. Try Groq
   try {
     const data = await parseWithGroq(base64Image);
     return { data, provider: "groq" };
   } catch (err: any) {
+    errors.push(`Groq: ${err.message}`);
     console.error("Groq failed:", err.message);
   }
 
@@ -25,6 +28,7 @@ export async function parseBusinessCard(base64Image: string) {
     const data = await parseWithMistral(base64Image);
     return { data, provider: "mistral" };
   } catch (err: any) {
+    errors.push(`Mistral: ${err.message}`);
     console.error("Mistral failed:", err.message);
   }
 
@@ -33,11 +37,13 @@ export async function parseBusinessCard(base64Image: string) {
     const data = await parseWithGemini(base64Image);
     return { data, provider: "gemini" };
   } catch (err: any) {
+    errors.push(`Gemini: ${err.message}`);
     console.error("Gemini failed:", err.message);
   }
 
-  throw new Error("All AI providers failed");
+  throw new Error(`All AI providers failed: ${errors.join(" | ")}`);
 }
+
 
 const aiRouter = {
   parseBusinessCard,
