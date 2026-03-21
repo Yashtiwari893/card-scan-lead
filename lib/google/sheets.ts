@@ -13,6 +13,7 @@ export type ContactData = {
 };
 
 import Contact, { IContact } from '@/lib/db/models/Contact';
+import mongoose from 'mongoose';
 
 /**
  * Ensures a Google Sheet exists for the user. If not, it creates a new one.
@@ -23,48 +24,57 @@ export async function getOrCreateSheet(userId: string) {
   const integration = await Integration.findOne({ userId, provider: 'google' });
   if (!integration) throw new Error('Google not connected');
 
+  console.log(`Checking sheet for user ${userId}, current sheetId: ${integration.sheetId}`);
   if (integration.sheetId) return integration.sheetId;
 
   // No sheet exists, create a new one named "Grid AI - Scanned Contacts"
-  const auth = await setCredentials(userId, integration.accessToken, integration.refreshToken);
-  const sheets = google.sheets({ version: 'v4', auth });
+  try {
+    const auth = await setCredentials(userId, integration.accessToken, integration.refreshToken);
+    const sheets = google.sheets({ version: 'v4', auth });
 
-  const spreadsheet = await sheets.spreadsheets.create({
-    requestBody: {
-      properties: {
-        title: "Grid AI - Scanned Contacts",
-      },
-      sheets: [
-        {
-          properties: {
-            title: "Sheet1",
-            gridProperties: {
-              frozenRowCount: 1,
+    console.log("Creating new Google Sheet...");
+    const spreadsheet = await sheets.spreadsheets.create({
+      requestBody: {
+        properties: {
+          title: "Grid AI - Scanned Contacts",
+        },
+        sheets: [
+          {
+            properties: {
+              title: "Sheet1",
+              gridProperties: {
+                frozenRowCount: 1,
+              },
             },
           },
-        },
-      ],
-    },
-  });
+        ],
+      },
+    });
 
-  const sheetId = spreadsheet.data.spreadsheetId;
-  if (!sheetId) throw new Error('Failed to create spreadsheet');
+    const sheetId = spreadsheet.data.spreadsheetId;
+    if (!sheetId) throw new Error('Failed to create spreadsheet');
 
-  // Add Headers
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: sheetId,
-    range: 'Sheet1!A1:G1',
-    valueInputOption: 'USER_ENTERED',
-    requestBody: {
-      values: [['Name', 'Email', 'Phone', 'Company', 'Role', 'Website', 'Created At']],
-    },
-  });
+    console.log(`Sheet created: ${sheetId}, adding headers...`);
+    // Add Headers
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: 'Sheet1!A1:G1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [['Name', 'Email', 'Phone', 'Company', 'Role', 'Website', 'Created At']],
+      },
+    });
 
-  // Save sheetId to integration
-  integration.sheetId = sheetId;
-  await integration.save();
+    // Save sheetId to integration
+    integration.sheetId = sheetId;
+    await integration.save();
+    console.log("Sheet ID saved to database.");
 
-  return sheetId;
+    return sheetId;
+  } catch (err: any) {
+    console.error("Error in getOrCreateSheet:", err.message);
+    throw err;
+  }
 }
 
 /**
@@ -73,13 +83,15 @@ export async function getOrCreateSheet(userId: string) {
 export async function syncHistoricalContacts(userId: string) {
   try {
     const sheetId = await getOrCreateSheet(userId);
+    console.log(`Starting historical sync for user ${userId} to sheet ${sheetId}`);
     
     // Find all contacts for this user NOT synced to sheets
     const unsyncedContacts = await Contact.find({
-      userId,
+      userId: new mongoose.Types.ObjectId(userId),
       syncedTo: { $ne: 'sheets' }
     });
 
+    console.log(`Found ${unsyncedContacts.length} unsynced contacts.`);
     if (unsyncedContacts.length === 0) return { success: true, count: 0 };
 
     // Set credentials once
@@ -99,9 +111,10 @@ export async function syncHistoricalContacts(userId: string) {
     ]);
 
     // Batch append to sheet
+    console.log("Pushing rows to Sheets...");
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: 'Sheet1!A:G',
+      range: 'Sheet1',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: rows
@@ -115,9 +128,10 @@ export async function syncHistoricalContacts(userId: string) {
       { $push: { syncedTo: 'sheets' } }
     );
 
+    console.log(`Successfully synced ${unsyncedContacts.length} contacts.`);
     return { success: true, count: unsyncedContacts.length };
-  } catch (err) {
-    console.error("Historical sync error:", err);
+  } catch (err: any) {
+    console.error("Historical sync error:", err.message);
     throw err;
   }
 }
@@ -128,32 +142,38 @@ export async function syncHistoricalContacts(userId: string) {
 export async function appendContactToSheet(userId: string, contact: ContactData) {
   await dbConnect();
   
-  // Ensure sheet exists first
-  const sheetId = await getOrCreateSheet(userId);
-  
-  const integration = await Integration.findOne({ userId, provider: 'google' });
-  const auth = await setCredentials(userId, integration.accessToken, integration.refreshToken);
-  const sheets = google.sheets({ version: 'v4', auth });
+  try {
+    // Ensure sheet exists first
+    const sheetId = await getOrCreateSheet(userId);
+    console.log(`Appending contact for user ${userId} to sheet ${sheetId}`);
+    
+    const integration = await Integration.findOne({ userId, provider: 'google' });
+    const auth = await setCredentials(userId, integration.accessToken, integration.refreshToken);
+    const sheets = google.sheets({ version: 'v4', auth });
 
-  const row = [
-    contact.name || '',
-    contact.email || '',
-    contact.phone || '',
-    contact.company || '',
-    contact.jobTitle || '',
-    contact.website || '',
-    new Date().toISOString()
-  ];
+    const row = [
+      contact.name || '',
+      contact.email || '',
+      contact.phone || '',
+      contact.company || '',
+      contact.jobTitle || '',
+      contact.website || '',
+      new Date().toISOString()
+    ];
 
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: sheetId,
-    range: 'Sheet1!A:G',
-    valueInputOption: 'USER_ENTERED',
-    requestBody: {
-      values: [row]
-    }
-  });
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: sheetId,
+      range: 'Sheet1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [row]
+      }
+    });
 
-  return { success: true };
+    console.log("Contact successfully appended to sheet.");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error in appendContactToSheet:", err.message);
+    throw err;
+  }
 }
-
